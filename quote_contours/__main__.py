@@ -19,7 +19,34 @@ def main():
     server_parser.add_argument('--load', type=Path)
     demo_parser = subcommands.add_parser('demo', help='运行本地资料往返演示')
     demo_parser.add_argument('--fixture', type=Path, default=Path('fixtures/demo.json'))
+    demo_parser.add_argument('--margin-floor', type=float, default=0.18)
+    analyze_parser = subcommands.add_parser('analyze', help='对固定 revision 运行毛利情景分析')
+    analyze_parser.add_argument('--database', required=True)
+    analyze_parser.add_argument('--revision', type=int, required=True)
+    analyze_parser.add_argument('--fixture', type=Path)
+    analyze_parser.add_argument('--margin-floor', type=float, default=0.18)
+    analyze_parser.add_argument('--contracts', nargs='*')
+    analyze_parser.add_argument('--scenarios', nargs='*')
+    analyze_parser.add_argument('--min-path-total', type=int, default=0)
+    analyze_parser.add_argument('--max-path-total', type=int)
     args = parser.parse_args()
+    if args.command == 'analyze':
+        from .analysis import analyse
+        repository = Repository(args.database)
+        if args.fixture:
+            repository.import_data(json.loads(args.fixture.read_text()), f'analyze-{args.fixture.name}')
+        snapshot = repository.get(args.revision)
+        options = {'margin_floor': args.margin_floor}
+        if args.contracts:
+            options['contracts'] = args.contracts
+        if args.scenarios:
+            options['scenarios'] = args.scenarios
+        options['search'] = {'min_path_total': args.min_path_total}
+        if args.max_path_total is not None:
+            options['search']['max_path_total'] = args.max_path_total
+        print(json.dumps({'revision': snapshot['revision'], 'digest': snapshot['digest'],
+                          'result': analyse(snapshot['data'], options)}, ensure_ascii=False, indent=2))
+        return
     if args.command == 'serve':
         repository = Repository(args.database)
         if args.load:
@@ -39,7 +66,13 @@ def main():
                 client = Client(f'http://127.0.0.1:{server.server_port}')
                 data = json.loads(args.fixture.read_text())
                 receipt = client.import_data(data, 'demo')
-                print(json.dumps({'import': receipt, 'summary': client.summary(receipt['revision'])}, ensure_ascii=False, indent=2))
+                analysis = client.analyze(receipt['revision'], {
+                    'margin_floor': args.margin_floor,
+                    'contracts': [data['contracts'][0]['id']],
+                    'scenarios': [scenario['id'] for scenario in data['scenarios']],
+                })
+                print(json.dumps({'import': receipt, 'summary': client.summary(receipt['revision']),
+                                  'analysis': analysis}, ensure_ascii=False, indent=2))
             finally:
                 server.shutdown()
                 worker.join()

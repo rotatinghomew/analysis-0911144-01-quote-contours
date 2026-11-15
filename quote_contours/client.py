@@ -17,3 +17,6 @@ class Client:
 
     def summary(self, revision=None):
         return self.request('/summary' + ('' if revision is None else f'?revision={revision}'))
+
+    def analyze(self, revision, options):
+        return self.request('/analysis', {'revision': revision, 'options': options})

@@ -7,6 +7,8 @@ def validate_ledger(data):
     contracts = {row['id'] for row in data['contracts']}
     orders = {}
     returned = {}
+    # Events are ordered by (month, record order).  The declared list order is
+    # the tie-breaker for same-month events and is preserved by the repository.
     for row in positions:
         require(row['contract'] in contracts, '履约合同不存在')
         require(type(row['month']) is int and 1 <= row['month'] <= 12, '履约月份错误')

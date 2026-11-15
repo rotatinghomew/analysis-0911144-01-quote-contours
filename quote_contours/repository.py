@@ -1,13 +1,9 @@
-import hashlib
 import json
 from pathlib import Path
 import sqlite3
 
+from .common import canonical, digest as sha256_digest
 from .domain import validate
-
-
-def canonical(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
 class Conflict(ValueError):
@@ -47,7 +43,7 @@ class Repository:
         except (KeyError, TypeError, IndexError) as error:
             raise ValueError('资料结构不完整或字段类型错误') from error
         payload = canonical(data)
-        digest = hashlib.sha256(payload.encode()).hexdigest()
+        digest = sha256_digest(data)
         with self.connect() as connection:
             connection.execute('BEGIN IMMEDIATE')
             receipt = connection.execute('SELECT digest, revision FROM receipts WHERE request_key=?', (request_key,)).fetchone()
